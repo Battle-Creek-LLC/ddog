@@ -2,55 +2,49 @@
 
 A Rust CLI for querying Datadog from the terminal and from AI agents.
 
-**Status:** v0.1 — logs commands implemented. Metrics, monitors, events,
-and incidents planned for later releases.
+Designed to be readable by humans at a TTY **and** machine-parseable when
+piped: the same command emits a colorized table in your shell and compact
+NDJSON into a script, with no flags required.
+
+**Status:** v0.1 — `logs` commands (`search`, `tail`, `get`, `aggregate`)
+implemented. Metrics, monitors, events, and incidents planned for later
+releases.
 
 ## Install
 
-```
-cargo install --path crates/dd-cli
-```
-
-Or run straight from a checkout:
+From this checkout:
 
 ```
-cargo run -p dd-cli -- logs search 'status:error' --from now-1h
+cargo install --path crates/dd-cli --root ~/.local
 ```
 
-## Authenticating with Datadog
+(or any prefix on your `PATH`). Binary name is `ddog`.
 
-The CLI needs **two** credentials:
+From a release build without installing:
 
-| Credential      | Env var       | What it's for                                         |
-| --------------- | ------------- | ----------------------------------------------------- |
-| API key         | `DD_API_KEY`  | Identifies the Datadog org. 32-char hex or UUID.      |
-| Application key | `DD_APP_KEY`  | Scopes the user's access to query APIs. 40-char hex.  |
+```
+cargo build --release
+./target/release/ddog --help
+```
 
-An **API key alone is not enough** — every read endpoint (logs search,
-metrics query, monitors list…) also requires an Application key.
+## Getting your Datadog credentials
 
-### Get an API key
+The CLI talks to the Datadog v2 API, which requires **two** credentials,
+issued on **two separate pages** in the Datadog UI:
 
-1. Log in to Datadog.
-2. Navigate to **Organization Settings → API Keys**
-   (direct link: `https://app.datadoghq.com/organization-settings/api-keys` —
-   swap the subdomain for EU/US3/US5/AP1 as needed).
-3. Click **New Key**, name it (e.g. `ddog-cli-<your-name>`), copy the key.
-4. **Permissions required:** none beyond org membership.
+| Credential         | Env var        | Where to get it                                                             | Identifies                          |
+| ------------------ | -------------- | --------------------------------------------------------------------------- | ----------------------------------- |
+| API key            | `DD_API_KEY`   | **Organization Settings → API Keys**                                        | Your Datadog **org** / tenant       |
+| Application key    | `DD_APP_KEY`   | **Organization Settings → Application Keys**                                | Your **user** / scoped access level |
 
-### Get an Application key
+The two keys are not interchangeable. An API key alone is rejected by every
+read endpoint; an Application key alone is rejected by every ingest endpoint.
 
-1. Same area of the UI: **Organization Settings → Application Keys**
-   (`https://app.datadoghq.com/organization-settings/application-keys`).
-2. Click **New Key**. Datadog will scope it to *your user*.
-3. **Scopes required for `ddog logs`:**
-   - `logs_read_data` (read log events)
-   - `logs_read_index_data` (read index-level queries / aggregate)
-4. Copy the key — Datadog shows it only once.
+### Step 1 — Identify your site
 
-### Pick the right site
-
-Your Datadog URL tells you the site:
+Datadog runs regional instances. The URL you log in at determines the `DD_SITE`
+you need. Everything else (API keys, App keys, dashboards) is scoped to the
+site — a key from `us1` will not work against `eu`.
 
 | You log in at…                     | `DD_SITE` value           |
 | ---------------------------------- | ------------------------- |
@@ -61,43 +55,103 @@ Your Datadog URL tells you the site:
 | `ap1.datadoghq.com`                | `ap1.datadoghq.com`       |
 | `app.ddog-gov.com`                 | `ddog-gov.com`            |
 
-### Set your env
+### Step 2 — Create an API key
+
+1. Log in to Datadog.
+2. Click your avatar (bottom-left) → **Organization Settings**.
+3. Under **Access** in the left nav, click **API Keys**.
+   Direct link (swap the subdomain for your site):
+   `https://app.datadoghq.com/organization-settings/api-keys`
+4. Click **New Key**. Give it a descriptive name (e.g. `ddog-cli-<your-name>`).
+5. Click the key row to reveal the value, then **Copy Key**. This is a
+   32-character hex string (or a UUID for legacy orgs). **Datadog shows the
+   full key on demand but it is scoped to the org, so treat it as a secret.**
+
+No extra permissions are needed beyond being an org member.
+
+### Step 3 — Create an Application key
+
+1. Still in **Organization Settings**, left nav → **Application Keys**
+   (different page from API Keys).
+   Direct link: `https://app.datadoghq.com/organization-settings/application-keys`
+2. Click **New Key**.
+3. **Scopes** (optional but recommended for least privilege):
+   - `logs_read_data` — required for `ddog logs search`, `tail`, `get`.
+   - `logs_read_index_data` — required for `ddog logs aggregate` and any
+     query that touches a specific index.
+   - `logs_read_archives` — only if you query `--storage online-archives`.
+   - *(Leave unscoped to inherit your user's role permissions — simplest,
+     fine for testing.)*
+4. Click **Create Application Key** and **Copy Key** — a 40-character hex
+   string. **This value is shown only at creation time.** If you lose it,
+   delete the key and create a new one.
+
+Permissions reference:
+`https://docs.datadoghq.com/account_management/rbac/permissions/`
+
+### Step 4 — Configure the CLI
+
+Three ways to supply credentials, checked in this order (highest wins):
+
+1. **CLI flags** — `--api-key`, `--app-key`, `--site`.
+2. **Environment** — `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE`, `DD_PROFILE`.
+3. **Config file** — `~/.config/ddog/config.toml` (path overridable with
+   `--config` / `DD_CONFIG`).
+
+**Env approach (simple):**
 
 ```bash
-export DD_API_KEY=<your-api-key>
-export DD_APP_KEY=<your-application-key>
-export DD_SITE=datadoghq.com   # or your region
+export DD_API_KEY=<32-char hex from step 2>
+export DD_APP_KEY=<40-char hex from step 3>
+export DD_SITE=datadoghq.com   # or your region from step 1
+ddog logs search 'status:error' --from now-15m
 ```
 
-### Or use a config file with profiles
+**Config file approach (multiple envs):**
 
-Default path: `~/.config/ddog/config.toml` (override with `--config` or
-`DD_CONFIG`). Example (see `docs/config.example.toml` for a copy-paste template):
+```bash
+mkdir -p ~/.config/ddog
+cp docs/config.example.toml ~/.config/ddog/config.toml
+chmod 600 ~/.config/ddog/config.toml
+# then edit and fill in your keys
+```
+
+Example `~/.config/ddog/config.toml`:
 
 ```toml
-default_site = "datadoghq.com"
+default_site    = "datadoghq.com"
 default_profile = "prod"
 
 [profiles.prod]
-api_key = "<api-key-goes-here>"
-app_key = "<app-key-goes-here>"
+api_key = "<api-key>"
+app_key = "<app-key>"
 site    = "datadoghq.com"
 
 [profiles.staging]
-api_key = "<api-key-goes-here>"
-app_key = "<app-key-goes-here>"
+api_key = "<api-key>"
+app_key = "<app-key>"
 site    = "datadoghq.eu"
 ```
 
 Select a profile with `--profile staging` or `DD_PROFILE=staging`.
 
-Precedence: **CLI flag > environment > profile > default**.
+### Verify
+
+```
+ddog logs search '*' --from now-5m --max 1 -o json
+```
+
+- **Empty `[]`** → credentials work, your org just has no logs in the window.
+- **`error: authentication failed`** → wrong keys, wrong site, or the App
+  key was created in a different org than the API key. Regenerate both in
+  the same org and retry.
+- **`error: upstream error 403`** → the App key is missing a required scope.
 
 ## Usage
 
 ```
 ddog logs search 'service:api status:error' --from now-1h
-ddog logs search 'status:error' --from now-15m -o ndjson         # agent-friendly stream
+ddog logs search 'status:error' --from now-15m -o ndjson       # agent-friendly stream
 ddog logs tail   'service:api status:error' --interval 5s
 ddog logs get    AAAAxxxxx
 ddog logs aggregate 'status:error' --group-by service --measure count --from now-1h
@@ -109,7 +163,7 @@ ddog logs aggregate 'status:error' --group-by service --measure count --from now
 | -------------- | ----------------------------------------------------------- |
 | `--from/--to`  | `now`, `now-15m`, `now-1h`, `now-7d`, or RFC-3339.          |
 | `-n / --limit` | Page size (1–1000).                                         |
-| `--max`        | Stop after N total events (`0` = unlimited).                |
+| `--max`        | Stop after N total events across pages (`0` = unlimited).   |
 | `--index`      | Comma-separated index names.                                |
 | `--fields`     | Attributes to include in text/table output.                 |
 | `--storage`    | `indexes` \| `online-archives` \| `flex`.                   |
@@ -155,3 +209,7 @@ cargo run -p dd-cli -- logs search --help
 4. `ddog events {list,post}`.
 5. `ddog incidents {list,get}`.
 6. Shell completions via `ddog completions <shell>`.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
