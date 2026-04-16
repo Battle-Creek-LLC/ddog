@@ -1,0 +1,15 @@
+# Copy to ~/.config/ddog/config.toml and fill in your keys.
+
+default_site = "datadoghq.com"
+default_profile = "prod"
+
+[profiles.prod]
+api_key = "<api-key>"
+app_key = "<app-key>"
+site    = "datadoghq.com"
+
+# Add more profiles as needed:
+# [profiles.staging]
+# api_key = "..."
+# app_key = "..."
+# site    = "datadoghq.eu"
