@@ -172,6 +172,42 @@ discovery aid for agents building queries.
 
 ---
 
+## `dd metrics` — timeseries
+
+Wraps the v2 multi-product query API. `query` (timeseries) ships first; `scalar`
+and multi-query formulas come later.
+
+### `dd metrics query`
+
+```
+dd metrics query [OPTIONS] [QUERY]
+```
+
+`POST /api/v2/query/timeseries` with a single `metrics` query. The legacy v1
+`GET /api/v1/query` is intentionally avoided — scoped Application keys are not
+authorized for it (it returns `403`), whereas the v2 endpoint honors the
+`timeseries_query` scope.
+
+| Flag          | Default   | Notes                                                       |
+| ------------- | --------- | ----------------------------------------------------------- |
+| `--from`      | `now-1d`  | Absolute RFC-3339 or relative (`now-1h`, `now-7d`). Sent as epoch ms. |
+| `--to`        | `now`     | Same format as `--from`.                                    |
+| `--interval`  | —         | Bucket duration (`1d`, `1h`, `15m`). Omitted ⇒ Datadog auto-rollup. |
+
+The column-oriented response (`series[]` + shared `times[]` + `values[][]`) is
+flattened to one record per (series, bucket): `{scope, timestamp, timestamp_ms,
+value}`. `value` is `null` for an empty bucket — deliberately distinct from `0`.
+
+**Example — agent**
+
+```
+$ dd metrics query 'sum:bridgeft.import.records{*} by {feed}.rollup(sum, 86400)' \
+    --from now-7d --interval 1d -o ndjson
+{"scope":"feed:positions","timestamp":"2026-05-21T00:00:00Z","timestamp_ms":1747785600000,"value":2901.0}
+```
+
+---
+
 ## Configuration file
 
 Optional `~/.config/dd/config.toml`. Environment wins over config; CLI flags
@@ -241,7 +277,8 @@ crates/
 
 ## Roadmap after v0
 
-1. `dd metrics query` — `/api/v2/metrics/query/scalar` and `/timeseries`.
+1. `dd metrics query` — timeseries via `/api/v2/query/timeseries` ✅ shipped;
+   `/api/v2/query/scalar` and multi-query formulas next.
 2. `dd monitors {list,get,mute,unmute}`.
 3. `dd events {list,post}`.
 4. `dd incidents {list,get}`.
