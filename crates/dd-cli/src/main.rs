@@ -1,5 +1,7 @@
 mod cli;
+mod dashboards;
 mod logs;
+mod monitors;
 mod output;
 mod time_spec;
 
@@ -61,5 +63,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
     match cli.command {
         Command::Logs(logs) => logs::dispatch(ctx, logs).await,
+        Command::Dashboards(d) => dashboards::dispatch(ctx, d).await,
+        Command::Monitors(m) => monitors::dispatch(ctx, m).await,
     }
 }

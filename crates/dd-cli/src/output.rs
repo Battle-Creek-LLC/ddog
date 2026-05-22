@@ -55,6 +55,30 @@ pub fn emit_ndjson_event(ev: &LogEvent) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Emit each item as its own JSON line (newline-delimited JSON).
+pub fn emit_ndjson_each<T: Serialize>(items: &[T]) -> anyhow::Result<()> {
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    for item in items {
+        serde_json::to_writer(&mut handle, item)?;
+        writeln!(handle)?;
+    }
+    Ok(())
+}
+
+/// Render a generic table from string headers and rows.
+pub fn emit_table_rows(headers: &[&str], rows: Vec<Vec<String>>) {
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_header(headers.iter().map(|h| h.to_string()).collect::<Vec<_>>());
+    for row in rows {
+        table.add_row(row);
+    }
+    println!("{table}");
+}
+
 pub fn emit_text_event(ev: &LogEvent, fields: &[String]) {
     let ts = ev
         .attributes

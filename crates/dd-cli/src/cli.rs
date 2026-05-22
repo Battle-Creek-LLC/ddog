@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use crate::dashboards::DashboardsArgs;
 use crate::logs::LogsArgs;
+use crate::monitors::MonitorsArgs;
 use crate::output::OutputMode;
 
 #[derive(Debug, Parser)]
@@ -49,6 +51,10 @@ pub struct Cli {
 pub enum Command {
     /// Query Datadog logs.
     Logs(LogsArgs),
+    /// Read Datadog dashboards.
+    Dashboards(DashboardsArgs),
+    /// Read Datadog monitors.
+    Monitors(MonitorsArgs),
 }
 
 pub struct Ctx {
