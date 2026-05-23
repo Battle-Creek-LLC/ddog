@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+categories.workspace = true
+description = "Datadog API client used by the ddog CLI."
 
 [dependencies]
 anyhow.workspace = true

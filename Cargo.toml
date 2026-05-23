@@ -3,10 +3,12 @@ members = ["crates/dd-cli", "crates/dd-api", "crates/dd-config"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
+repository = "https://github.com/Battle-Creek-LLC/ddog"
+categories = ["command-line-utilities"]
 
 [workspace.dependencies]
 anyhow = "1"

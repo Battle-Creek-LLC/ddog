@@ -1,17 +1,26 @@
 [package]
-name = "dd-cli"
+name = "bcl-ddog"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+categories.workspace = true
+description = "A fast CLI for querying Datadog logs."
+keywords = ["datadog", "logs", "cli", "observability"]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/ddog-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "ddog{ binary-ext }"
 
 [[bin]]
 name = "ddog"
 path = "src/main.rs"
 
 [dependencies]
-dd-api = { path = "../dd-api" }
-dd-config = { path = "../dd-config" }
+dd-api = { path = "../dd-api", version = "0.2.0" }
+dd-config = { path = "../dd-config", version = "0.2.0" }
 anyhow.workspace = true
 clap.workspace = true
 is-terminal.workspace = true
