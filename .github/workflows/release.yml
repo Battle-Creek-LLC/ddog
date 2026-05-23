@@ -14,8 +14,26 @@ permissions:
   contents: read
 
 jobs:
+  # Ensure the GitHub Release exists before the matrix uploads to it. The upload
+  # action only creates a release when given a real tag ref; on tag-push the old
+  # `ref: ''` left it with none, so every job failed with "release not found".
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create release if it doesn't exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --generate-notes
+
   upload-assets:
     name: ${{ matrix.target }}
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -46,4 +64,4 @@ jobs:
           locked: true
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || '' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
