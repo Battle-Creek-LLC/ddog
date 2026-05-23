@@ -31,16 +31,11 @@ git tag -a vX.Y.Z -m "vX.Y.Z: <summary>" && git push origin vX.Y.Z
 
 ## 2. Attach the GitHub release binaries
 
-> **Gotcha:** the tag-push run of `release.yml` fails with a retrying
-> **`release not found`** loop. `upload-rust-binary-action` attaches to a GitHub
-> *Release* object but doesn't create one (the workflow's `ref` is empty on push).
-> This has failed on every tag-push release so far.
-
-Create the Release first, then re-run the failed (already-compiled) jobs:
+Pushing the tag triggers `release.yml`, which creates the GitHub Release (via its
+`create-release` job) and uploads binaries for all 5 targets. Just wait for it:
 
 ```sh
-gh release create vX.Y.Z --title "vX.Y.Z — <summary>" --notes "..."
-gh run rerun <run-id> --failed        # run-id from: gh run list --workflow=release.yml
+gh run watch "$(gh run list --workflow=release.yml -L1 --json databaseId -q '.[0].databaseId')" --exit-status
 ```
 
 Verify 5 targets uploaded (linux/macos x86_64+aarch64, windows x86_64) plus `.sha256`:
@@ -49,8 +44,10 @@ Verify 5 targets uploaded (linux/macos x86_64+aarch64, windows x86_64) plus `.sh
 gh release view vX.Y.Z --json assets -q '.assets[].name'
 ```
 
-(Equivalent alternative: trigger `release.yml` via `workflow_dispatch` with the
-tag input — that path creates/uses the release correctly.)
+> **History:** before the `create-release` job was added, tag-push runs failed with
+> a retrying **`release not found`** loop (the upload action had no release to
+> attach to because `ref` was empty on push). If you ever hit that on an old
+> revision, `gh release create vX.Y.Z` then `gh run rerun <run-id> --failed`.
 
 ## 3. Publish to crates.io (manual)
 
