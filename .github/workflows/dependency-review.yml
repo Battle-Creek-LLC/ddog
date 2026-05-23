@@ -11,4 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # Advisory only: the action errors with "Dependency review is not supported
+      # on this repository" until the org enables the Dependency graph. Keep it
+      # running so it starts working once enabled, but don't block PRs on it.
       - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48
+        continue-on-error: true
