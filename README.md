@@ -6,8 +6,8 @@ Designed to be readable by humans at a TTY **and** machine-parseable when
 piped: the same command emits a colorized table in your shell and compact
 NDJSON into a script, with no flags required.
 
-**Status:** v0.1 — `logs` commands (`search`, `tail`, `get`, `aggregate`)
-implemented. Metrics, monitors, events, and incidents planned for later
+**Status:** v0.1 — `logs` commands (`search`, `tail`, `get`, `aggregate`) and
+`metrics query` implemented. Monitors, events, and incidents planned for later
 releases.
 
 ## Install
@@ -80,6 +80,8 @@ No extra permissions are needed beyond being an org member.
    - `logs_read_index_data` — required for `ddog logs aggregate` and any
      query that touches a specific index.
    - `logs_read_archives` — only if you query `--storage online-archives`.
+   - `timeseries_query` — required for `ddog metrics query` (a `logs_*`-only
+     key returns `403` against the query endpoint).
    - *(Leave unscoped to inherit your user's role permissions — simplest,
      fine for testing.)*
 4. Click **Create Application Key** and **Copy Key** — a 40-character hex
@@ -155,6 +157,8 @@ ddog logs search 'status:error' --from now-15m -o ndjson       # agent-friendly 
 ddog logs tail   'service:api status:error' --interval 5s
 ddog logs get    AAAAxxxxx
 ddog logs aggregate 'status:error' --group-by service --measure count --from now-1h
+ddog metrics query 'avg:system.cpu.user{*} by {host}' --from now-1h            # timeseries points
+ddog metrics query 'sum:requests.count{*}.rollup(sum, 86400)' --from now-7d --interval 1d -o ndjson
 ```
 
 ### Common flags
@@ -182,6 +186,28 @@ ddog logs aggregate 'status:error' --group-by service --measure count --from now
 `0` success · `1` usage/parse · `2` auth (401/403) · `3` not found · `4`
 rate limited · `5` upstream 5xx · `6` network.
 
+### `ddog metrics query`
+
+Wraps the v2 timeseries query API (`POST /api/v2/query/timeseries`). Pass one
+Datadog metric query; the column-oriented response is flattened to one row per
+(series, bucket) — handy for spotting a series that went to zero or fell off.
+
+| Flag          | Purpose                                                            |
+| ------------- | ----------------------------------------------------------------- |
+| `--from/--to` | Window. `now`, `now-<N><unit>`, or RFC-3339.                       |
+| `--interval`  | Bucket size as a duration (`1d`, `1h`, `15m`). Optional — Datadog rolls up automatically, or use the query's own `.rollup(...)`. |
+| `-o`          | `table` (scope/timestamp/value) · `json`/`ndjson` (one point per row). |
+
+```
+$ ddog metrics query 'sum:bridgeft.import.records{*} by {feed}.rollup(sum, 86400)' \
+    --from now-7d --interval 1d -o ndjson
+{"scope":"feed:positions","timestamp":"2026-05-21T00:00:00Z","timestamp_ms":1747785600000,"value":2901.0}
+{"scope":"feed:positions","timestamp":"2026-05-22T00:00:00Z","timestamp_ms":1747872000000,"value":null}
+```
+
+A `null` value marks a bucket with no data, kept distinct from a real `0`.
+Requires an Application key with the **`timeseries_query`** scope.
+
 ## Architecture
 
 ```
@@ -205,7 +231,7 @@ cargo run -p dd-cli -- logs search --help
 ## Roadmap
 
 1. `ddog logs facets` (currently stubbed).
-2. `ddog metrics query`.
+2. `ddog metrics query` — scalar queries and multi-query formulas.
 3. `ddog monitors {list,get,mute}`.
 4. `ddog events {list,post}`.
 5. `ddog incidents {list,get}`.

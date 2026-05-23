@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 use crate::dashboards::DashboardsArgs;
 use crate::logs::LogsArgs;
+use crate::metrics::MetricsArgs;
 use crate::monitors::MonitorsArgs;
 use crate::output::OutputMode;
 
@@ -51,6 +52,8 @@ pub struct Cli {
 pub enum Command {
     /// Query Datadog logs.
     Logs(LogsArgs),
+    /// Query Datadog metrics.
+    Metrics(MetricsArgs),
     /// Read Datadog dashboards.
     Dashboards(DashboardsArgs),
     /// Read Datadog monitors.
