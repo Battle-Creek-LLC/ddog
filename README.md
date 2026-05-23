@@ -192,6 +192,7 @@ crates/
 ```
 
 Full spec: [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
+Cutting a release: [`docs/RELEASING.md`](docs/RELEASING.md).
 
 ## Development
 
