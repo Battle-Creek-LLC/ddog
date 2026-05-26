@@ -19,8 +19,8 @@ name = "ddog"
 path = "src/main.rs"
 
 [dependencies]
-dd-api = { path = "../dd-api", version = "0.3.0" }
-dd-config = { path = "../dd-config", version = "0.3.0" }
+dd-api = { path = "../dd-api", version = "0.4.0" }
+dd-config = { path = "../dd-config", version = "0.4.0" }
 anyhow.workspace = true
 clap.workspace = true
 is-terminal.workspace = true
