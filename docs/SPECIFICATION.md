@@ -160,10 +160,28 @@ dd logs aggregate [OPTIONS] [QUERY]
 
   --group-by <facet>      Repeatable. e.g. --group-by service --group-by status
   --measure <agg:facet>   Repeatable. e.g. --measure count, --measure avg:@duration
+  --interval <dur>        Bucket size (`1d`, `1h`, `15m`). Turns each measure into
+                          a timeseries; one row per time bucket × measure × group.
   --from, --to            As above.
 ```
 
 Output: table by default, JSON for agents.
+
+Without `--interval` each group yields a single total (one `computes` map per
+bucket, unchanged). With `--interval`, each measure's `compute` is sent as
+`{type: "timeseries", interval}` and Datadog returns `computes.c{i}` as an array
+of `{time, value}`. We flatten that to one record per (group, measure, bucket):
+`{by, measure, time, value}` — `value` is `null` for an empty bucket, distinct
+from `0`. JSON emits the array; ndjson one object per line; table adds `time`
+and `measure` columns alongside `group`.
+
+**Example — agent**
+
+```
+$ dd logs aggregate 'service:nodejs-worker' --group-by feed \
+    --interval 1d --from now-7d -o ndjson
+{"by":{"feed":"positions"},"measure":"count","time":"2026-05-21T00:00:00.000Z","value":2901}
+```
 
 ### `dd logs facets`
 

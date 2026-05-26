@@ -157,6 +157,7 @@ ddog logs search 'status:error' --from now-15m -o ndjson       # agent-friendly 
 ddog logs tail   'service:api status:error' --interval 5s
 ddog logs get    AAAAxxxxx
 ddog logs aggregate 'status:error' --group-by service --measure count --from now-1h
+ddog logs aggregate 'status:error' --group-by service --interval 1d --from now-7d  # per-day buckets
 ddog metrics query 'avg:system.cpu.user{*} by {host}' --from now-1h            # timeseries points
 ddog metrics query 'sum:requests.count{*}.rollup(sum, 86400)' --from now-7d --interval 1d -o ndjson
 ```
