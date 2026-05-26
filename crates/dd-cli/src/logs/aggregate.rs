@@ -176,11 +176,14 @@ fn flatten_timeseries(buckets: &[Bucket], measures: &[String]) -> Vec<TsRow> {
                 rows.push(TsRow {
                     by: b.by.clone(),
                     measure: measure.clone(),
-                    time: p
-                        .get("time")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_string(),
+                    // Datadog returns `time` as an ISO-8601 string; tolerate an
+                    // unexpected non-string shape (e.g. epoch ms) by rendering
+                    // its raw form rather than silently dropping it to "".
+                    time: match p.get("time") {
+                        Some(Value::String(s)) => s.clone(),
+                        Some(other) => other.to_string(),
+                        None => String::new(),
+                    },
                     value: p.get("value").cloned().unwrap_or(Value::Null),
                 });
             }
@@ -312,6 +315,20 @@ mod tests {
         // A measure with no matching compute key yields no rows for it.
         let buckets = buckets_from(r#"{"data":{"buckets":[{"by":{},"computes":{}}]}}"#);
         assert!(flatten_timeseries(&buckets, &["count".to_string()]).is_empty());
+    }
+
+    #[test]
+    fn flatten_tolerates_non_string_time() {
+        // Defensive: if Datadog ever returns a numeric `time`, render it rather
+        // than collapsing the bucket timestamp to an empty string.
+        let buckets = buckets_from(
+            r#"{"data":{"buckets":[
+                {"by":{},"computes":{"c0":[{"value":1,"time":1747612800000}]}}
+            ]}}"#,
+        );
+        let rows = flatten_timeseries(&buckets, &["count".to_string()]);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].time, "1747612800000");
     }
 
     #[test]
