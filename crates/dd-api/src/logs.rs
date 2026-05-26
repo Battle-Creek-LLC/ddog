@@ -178,8 +178,13 @@ pub struct Compute {
     pub aggregation: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metric: Option<String>,
+    /// `"total"` (Datadog default when omitted) or `"timeseries"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// Bucket size (`1d`, `1h`, `5m`, …). Applies only when `type` is
+    /// `"timeseries"`; ignored otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -216,5 +221,67 @@ pub struct Bucket {
 impl Client {
     pub async fn logs_aggregate(&self, req: &AggregateRequest) -> Result<AggregateResponse> {
         self.post_json(AGGREGATE_PATH, req).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compute_omits_type_and_interval_by_default() {
+        let c = Compute {
+            aggregation: "count".into(),
+            metric: None,
+            r#type: None,
+            interval: None,
+        };
+        let v = serde_json::to_value(&c).unwrap();
+        assert_eq!(v["aggregation"], "count");
+        assert!(v.get("type").is_none());
+        assert!(v.get("interval").is_none());
+        assert!(v.get("metric").is_none());
+    }
+
+    #[test]
+    fn compute_serializes_timeseries_with_interval() {
+        let c = Compute {
+            aggregation: "avg".into(),
+            metric: Some("@duration".into()),
+            r#type: Some("timeseries".into()),
+            interval: Some("1d".into()),
+        };
+        let v = serde_json::to_value(&c).unwrap();
+        assert_eq!(v["aggregation"], "avg");
+        assert_eq!(v["metric"], "@duration");
+        assert_eq!(v["type"], "timeseries");
+        assert_eq!(v["interval"], "1d");
+    }
+
+    #[test]
+    fn parses_timeseries_aggregate_response() {
+        let raw = r#"{
+            "data": {
+                "buckets": [
+                    {
+                        "by": {"feed": "positions"},
+                        "computes": {
+                            "c0": [
+                                {"value": 100, "time": "2026-05-19T00:00:00.000Z"},
+                                {"value": 120, "time": "2026-05-20T00:00:00.000Z"}
+                            ]
+                        }
+                    }
+                ]
+            }
+        }"#;
+        let resp: AggregateResponse = serde_json::from_str(raw).unwrap();
+        let buckets = resp.data.unwrap().buckets;
+        assert_eq!(buckets.len(), 1);
+        assert_eq!(buckets[0].by["feed"], "positions");
+        let points = buckets[0].computes["c0"].as_array().unwrap();
+        assert_eq!(points.len(), 2);
+        assert_eq!(points[0]["value"], 100);
+        assert_eq!(points[0]["time"], "2026-05-19T00:00:00.000Z");
     }
 }
